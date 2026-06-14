@@ -4,7 +4,7 @@ langchain-community==0.2.19
 langchain-groq==0.1.9
 langchain-huggingface==0.0.3
 faiss-cpu==1.8.0
-youtube-transcript-api==0.6.2
+youtube-transcript-api==1.2.4
 python-dotenv==1.0.1
 sentence-transformers==3.0.1
 torch
