@@ -158,28 +158,77 @@ st.markdown("""
 st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 st.markdown("<h3 style='margin-top:0; font-size: 1.25rem;'>1. Connect YouTube Video</h3>", unsafe_allow_html=True)
 
-youtube_url = st.text_input(
-    "Enter YouTube URL",
-    placeholder="https://www.youtube.com/watch?v=...",
-    label_visibility="collapsed"
-)
+tab1, tab2 = st.tabs(["🔍 Fetch Automatically", "✍️ Paste Transcript Manually"])
 
-if st.button("Process Video"):
-    video_id = get_video_id(youtube_url)
+with tab1:
+    st.markdown("<div style='margin-bottom: 8px; font-weight: 500;'>Enter YouTube URL</div>", unsafe_allow_html=True)
+    youtube_url = st.text_input(
+        "Enter YouTube URL",
+        placeholder="https://www.youtube.com/watch?v=...",
+        label_visibility="collapsed",
+        key="auto_url"
+    )
     
-    if not video_id:
-        st.error("Invalid YouTube URL. Please make sure it is a valid link.")
-    else:
-        with st.spinner("Fetching transcript and building vector embeddings..."):
-            transcript = get_transcript(video_id)
-            if not transcript:
-                st.error("Transcript is not available for this video. Please try another video with captions enabled.")
-            else:
-                vector_db = create_vector_store(transcript)
+    with st.expander("⚙️ Advanced: Configure YouTube Cookies (Bypass cloud IP blocks)"):
+        st.markdown("""
+        <div style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 8px;">
+            YouTube blocks requests from cloud provider servers. To bypass this, export cookies from your logged-in YouTube account using a browser extension like <i>Get cookies.txt LOCALLY</i> (Netscape or JSON format) and paste them here.
+        </div>
+        """, unsafe_allow_html=True)
+        cookies_input = st.text_area(
+            "Paste JSON or Netscape cookies here:",
+            placeholder='[{"name": "...", "value": "..."}, ...]\nor\n# Netscape HTTP Cookie File...',
+            height=100,
+            label_visibility="collapsed"
+        )
+        
+    if st.button("Process Video", key="btn_process_auto"):
+        video_id = get_video_id(youtube_url)
+        
+        if not video_id:
+            st.error("Invalid YouTube URL. Please make sure it is a valid link.")
+        else:
+            with st.spinner("Fetching transcript and building vector embeddings..."):
+                custom_cookies = cookies_input.strip() if cookies_input.strip() else None
+                transcript = get_transcript(video_id, custom_cookies=custom_cookies)
+                if not transcript:
+                    st.error("Could not retrieve transcript automatically. YouTube is blocking this server's IP address. Please use the 'Paste Transcript Manually' tab above to paste the transcript.")
+                else:
+                    vector_db = create_vector_store(transcript)
+                    st.session_state.vector_db = vector_db
+                    st.session_state.current_video_id = video_id
+                    st.session_state.current_video_url = youtube_url
+                    st.success("Video processed successfully! You can now ask questions below.")
+
+with tab2:
+    st.markdown("<div style='margin-bottom: 8px; font-weight: 500;'>YouTube URL (Optional reference)</div>", unsafe_allow_html=True)
+    youtube_url_manual = st.text_input(
+        "YouTube URL (Optional reference)",
+        placeholder="https://www.youtube.com/watch?v=...",
+        label_visibility="collapsed",
+        key="manual_url"
+    )
+    
+    st.markdown("<div style='margin-top: 12px; margin-bottom: 8px; font-weight: 500;'>Paste Transcript Text</div>", unsafe_allow_html=True)
+    pasted_transcript = st.text_area(
+        "Paste transcript",
+        placeholder="Copy the transcript text from YouTube's sidebar, captions, or a transcript generator tool and paste it here...",
+        height=200,
+        label_visibility="collapsed",
+        key="pasted_text"
+    )
+    
+    if st.button("Process Pasted Transcript", key="btn_process_manual"):
+        if not pasted_transcript.strip():
+            st.error("Please paste the transcript text first.")
+        else:
+            video_id = get_video_id(youtube_url_manual) if youtube_url_manual else "manual_input"
+            with st.spinner("Processing transcript and building vector embeddings..."):
+                vector_db = create_vector_store(pasted_transcript)
                 st.session_state.vector_db = vector_db
                 st.session_state.current_video_id = video_id
-                st.session_state.current_video_url = youtube_url
-                st.success("Video processed successfully! You can now ask questions below.")
+                st.session_state.current_video_url = youtube_url_manual if youtube_url_manual else "Pasted Transcript"
+                st.success("Transcript processed successfully! You can now ask questions below.")
 st.markdown('</div>', unsafe_allow_html=True)
 
 # Step 2: Chat / QA Section

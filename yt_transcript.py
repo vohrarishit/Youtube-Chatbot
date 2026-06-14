@@ -2,24 +2,26 @@ import os
 import tempfile
 from youtube_transcript_api import YouTubeTranscriptApi
 
-def get_transcript(video_id):
+def get_transcript(video_id, custom_cookies=None):
     temp_cookie_file = None
     try:
         # 1. Determine if we have a cookies string or local cookies file
-        youtube_cookies_env = os.environ.get("YOUTUBE_COOKIES")
         cookies_content = None
-        
-        if youtube_cookies_env:
-            cookies_content = youtube_cookies_env
+        if custom_cookies:
+            cookies_content = custom_cookies
         else:
-            for filepath in ['cookies.txt', 'cookies.json']:
-                if os.path.exists(filepath):
-                    try:
-                        with open(filepath, 'r', encoding='utf-8') as f:
-                            cookies_content = f.read()
-                        break
-                    except Exception:
-                        pass
+            youtube_cookies_env = os.environ.get("YOUTUBE_COOKIES")
+            if youtube_cookies_env:
+                cookies_content = youtube_cookies_env
+            else:
+                for filepath in ['cookies.txt', 'cookies.json']:
+                    if os.path.exists(filepath):
+                        try:
+                            with open(filepath, 'r', encoding='utf-8') as f:
+                                cookies_content = f.read()
+                            break
+                        except Exception:
+                            pass
         
         # 2. Write cookies to a temporary file if we have cookies content
         if cookies_content:
@@ -31,58 +33,44 @@ def get_transcript(video_id):
             except Exception as e:
                 print(f"Failed to create temporary cookies file: {e}")
         
-        # 3. Call youtube-transcript-api based on the library version
-        if hasattr(YouTubeTranscriptApi, 'get_transcript'):
-            # OLD VERSION (e.g. 0.6.2)
-            if temp_cookie_file:
-                transcript = YouTubeTranscriptApi.get_transcript(video_id, cookies=temp_cookie_file)
-            else:
-                transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        # 3. Call youtube-transcript-api using session loading (v1.2.4+)
+        from requests import Session
+        session = Session()
+        
+        if temp_cookie_file and cookies_content:
+            cookies_loaded = False
+            # Try parsing as JSON first
+            if cookies_content.strip().startswith('['):
+                try:
+                    import json
+                    cookies_list = json.loads(cookies_content)
+                    for cookie in cookies_list:
+                        name = cookie.get('name') or cookie.get('key')
+                        value = cookie.get('value')
+                        domain = cookie.get('domain')
+                        path = cookie.get('path', '/')
+                        if name and value:
+                            session.cookies.set(name, value, domain=domain, path=path)
+                    cookies_loaded = True
+                except Exception:
+                    pass
             
-            # In old version, transcript is a list of dicts: [{'text': '...', 'start': ...}]
-            text = " ".join(
-                chunk['text'] for chunk in transcript
-            )
-        else:
-            # NEW VERSION (e.g. 1.2.4)
-            from requests import Session
-            session = Session()
-            
-            if temp_cookie_file:
-                # Load cookies into session
-                cookies_loaded = False
-                # Try parsing as JSON first
-                if cookies_content.strip().startswith('['):
-                    try:
-                        import json
-                        cookies_list = json.loads(cookies_content)
-                        for cookie in cookies_list:
-                            name = cookie.get('name') or cookie.get('key')
-                            value = cookie.get('value')
-                            domain = cookie.get('domain')
-                            path = cookie.get('path', '/')
-                            if name and value:
-                                session.cookies.set(name, value, domain=domain, path=path)
-                        cookies_loaded = True
-                    except Exception:
-                        pass
-                
-                # Fallback to MozillaCookieJar Netscape loader
-                if not cookies_loaded:
-                    try:
-                        import http.cookiejar
-                        cj = http.cookiejar.MozillaCookieJar(temp_cookie_file)
-                        cj.load(ignore_discard=True, ignore_expires=True)
-                        session.cookies = cj
-                    except Exception as cookie_err:
-                        print(f"Failed to load Netscape cookies: {cookie_err}")
-            
-            api = YouTubeTranscriptApi(http_client=session)
-            transcript = api.fetch(video_id)
-            
-            text = " ".join(
-                chunk.text for chunk in transcript
-            )
+            # Fallback to MozillaCookieJar Netscape loader
+            if not cookies_loaded:
+                try:
+                    import http.cookiejar
+                    cj = http.cookiejar.MozillaCookieJar(temp_cookie_file)
+                    cj.load(ignore_discard=True, ignore_expires=True)
+                    session.cookies = cj
+                except Exception as cookie_err:
+                    print(f"Failed to load Netscape cookies: {cookie_err}")
+        
+        api = YouTubeTranscriptApi(http_client=session)
+        transcript = api.fetch(video_id)
+        
+        text = " ".join(
+            chunk.text for chunk in transcript
+        )
 
         # Clean up temporary cookie file
         if temp_cookie_file and os.path.exists(temp_cookie_file):
