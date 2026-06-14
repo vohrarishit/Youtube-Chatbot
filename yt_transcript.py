@@ -1,14 +1,11 @@
 from youtube_transcript_api import YouTubeTranscriptApi
 
-
 def get_transcript(video_id):
 
-    api = YouTubeTranscriptApi()
-
-    transcript = api.fetch(video_id)
+    transcript = YouTubeTranscriptApi.get_transcript(video_id)
 
     text = " ".join(
-        chunk.text for chunk in transcript
+        item["text"] for item in transcript
     )
 
     return text
