@@ -1,12 +1,8 @@
 from youtube_transcript_api import YouTubeTranscriptApi
 
 def get_transcript(video_id):
-
     try:
-        transcript = YouTubeTranscriptApi.get_transcript(
-            video_id,
-            languages=['en']
-        )
+        transcript = YouTubeTranscriptApi.get_transcript(video_id)
 
         text = " ".join(
             item["text"] for item in transcript
@@ -16,4 +12,4 @@ def get_transcript(video_id):
 
     except Exception as e:
         print(f"Transcript Error: {e}")
-        return None
+        return ""

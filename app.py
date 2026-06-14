@@ -45,13 +45,15 @@ if st.button("Process Video"):
         youtube_url
     )
 
-    transcript = get_transcript(
-        video_id
-    )
+    transcript = get_transcript(video_id)
+
+    if not transcript:
+        st.error("Transcript not available for this video. Please try another video.")
+    st.stop()
 
     vector_db = create_vector_store(
-        transcript
-    )
+    transcript
+)
 
     st.session_state.vector_db = vector_db
 
