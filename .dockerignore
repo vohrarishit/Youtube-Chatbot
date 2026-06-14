@@ -1,0 +1,25 @@
+# Python virtual environment
+venv/
+.venv/
+env/
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Git folder and configs
+.git/
+.gitignore
+
+# Environment variables containing sensitive keys
+.env
+
+# Docker files
+Dockerfile
+.dockerignore
+
+# Streamlit local state
+.streamlit/

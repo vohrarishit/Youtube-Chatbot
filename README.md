@@ -1,3 +1,14 @@
+---
+title: YouTube Chatbot
+emoji: 🎥
+colorFrom: indigo
+colorTo: pink
+sdk: streamlit
+sdk_version: 1.35.0
+app_file: app.py
+pinned: false
+---
+
 # 🎥 YouTube Chatbot using LangChain
 
 A chatbot that allows users to ask questions about any YouTube video. The application extracts the video transcript, stores it in a vector database, and uses an LLM to answer user queries based on the video content.
@@ -106,13 +117,39 @@ streamlit run app.py
 * Chat history memory
 * PDF export of responses
 * Advanced filtering and search
-* Deploy on Streamlit Cloud/Vercel
+
+## 🚀 Deployment Guide
+
+This application can be deployed using several methods:
+
+### 1. Streamlit Community Cloud (Recommended & Easiest)
+1. Push the code to your GitHub repository.
+2. Go to [share.streamlit.io](https://share.streamlit.io/) and click **"New app"**.
+3. Select your repository, branch (`main`), and set the main file path to `app.py`.
+4. Click **"Advanced settings"** and add `GROQ_API_KEY = "your_actual_key"` under **"Secrets"**.
+5. Click **"Deploy"**.
+
+### 2. Hugging Face Spaces
+Since the frontmatter is already added in the `README.md`, you can deploy directly:
+1. Go to [Hugging Face Spaces](https://huggingface.co/new-space).
+2. Choose **Streamlit** as the SDK.
+3. Under Space Settings, add `GROQ_API_KEY` to **Variables and Secrets**.
+4. Push your repository files to the Space.
+
+### 3. Docker Deployment
+A `Dockerfile` is provided for deploying on container services (e.g. Render, Railway, AWS, GCP).
+1. Build the Docker image:
+   ```bash
+   docker build -t yt_chatbot .
+   ```
+2. Run the Docker container locally:
+   ```bash
+   docker run -p 8501:8501 --env-file .env yt_chatbot
+   ```
+3. When deploying to production container platforms, expose port `8501` and define the `GROQ_API_KEY` environment variable.
 
 ## 👨‍💻 Author
 
 **Rishit Vohra**
 
 GitHub: https://github.com/vohrarishit
-
-```
-```
