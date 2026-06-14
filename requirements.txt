@@ -7,3 +7,5 @@ faiss-cpu
 youtube-transcript-api
 python-dotenv
 sentence-transformers
+torch
+torchvision
