@@ -126,8 +126,22 @@ This application can be deployed using several methods:
 1. Push the code to your GitHub repository.
 2. Go to [share.streamlit.io](https://share.streamlit.io/) and click **"New app"**.
 3. Select your repository, branch (`main`), and set the main file path to `app.py`.
-4. Click **"Advanced settings"** and add `GROQ_API_KEY = "your_actual_key"` under **"Secrets"**.
+4. Click **"Advanced settings"** and under **"Secrets"**, add your credentials:
+   ```toml
+   GROQ_API_KEY = "your_actual_groq_key"
+   YOUTUBE_COOKIES = """
+   # Paste Netscape-formatted YouTube cookies here
+   """
+   ```
 5. Click **"Deploy"**.
+
+### 🔑 Resolving "Transcript is not available" (YouTube Cloud Blocks)
+YouTube blocks requests from cloud data center IPs (such as those used by Streamlit Cloud or HF Spaces). To bypass this block:
+1. Log in to YouTube in your browser.
+2. Use a browser extension (such as **"Get cookies.txt LOCALLY"** or **"Cookie-Editor"**) to export your cookies in **Netscape** format.
+3. **Local Dev**: Save this file as `cookies.txt` in the root folder of this project (it is ignored by Git).
+4. **Cloud Deployment**: Paste the entire text content of your Netscape cookie file into the environment variable/secret named `YOUTUBE_COOKIES` in your deployment settings dashboard.
+
 
 ### 2. Hugging Face Spaces
 Since the frontmatter is already added in the `README.md`, you can deploy directly:
