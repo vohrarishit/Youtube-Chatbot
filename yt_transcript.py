@@ -1,92 +1,104 @@
 import os
-from requests import Session
+import tempfile
 from youtube_transcript_api import YouTubeTranscriptApi
 
-def parse_cookies_string(session, cookies_str):
-    try:
-        cookies_str = cookies_str.strip()
-        if not cookies_str:
-            return False
-        
-        # 1. Try JSON format
-        if cookies_str.startswith('['):
-            try:
-                import json
-                cookies_list = json.loads(cookies_str)
-                loaded_count = 0
-                for cookie in cookies_list:
-                    name = cookie.get('name') or cookie.get('key')
-                    value = cookie.get('value')
-                    domain = cookie.get('domain')
-                    path = cookie.get('path', '/')
-                    if name and value:
-                        session.cookies.set(name, value, domain=domain, path=path)
-                        loaded_count += 1
-                if loaded_count > 0:
-                    print(f"Successfully loaded {loaded_count} JSON cookies.")
-                    return True
-            except Exception as json_err:
-                print(f"Failed to load JSON cookies: {json_err}. Falling back to text parser.")
-
-        # 2. Try Netscape format (tab or space separated)
-        loaded_count = 0
-        for line in cookies_str.splitlines():
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            
-            parts = line.split('\t')
-            if len(parts) < 7:
-                parts = line.split()
-                
-            if len(parts) >= 7:
-                domain = parts[0]
-                path = parts[2]
-                name = parts[5]
-                value = parts[6]
-                session.cookies.set(name, value, domain=domain, path=path)
-                loaded_count += 1
-                
-        if loaded_count > 0:
-            print(f"Successfully loaded {loaded_count} Netscape cookies.")
-            return True
-        return False
-    except Exception as e:
-        print(f"Error parsing cookies string: {e}")
-        return False
-
 def get_transcript(video_id):
+    temp_cookie_file = None
     try:
-        session = Session()
-        cookies_loaded = False
-        
-        # 1. Try to load cookies from environment variable (secure, for deployment)
+        # 1. Determine if we have a cookies string or local cookies file
         youtube_cookies_env = os.environ.get("YOUTUBE_COOKIES")
-        if youtube_cookies_env:
-            cookies_loaded = parse_cookies_string(session, youtube_cookies_env)
+        cookies_content = None
         
-        # 2. Try to load cookies from local cookie files (for local dev)
-        if not cookies_loaded:
+        if youtube_cookies_env:
+            cookies_content = youtube_cookies_env
+        else:
             for filepath in ['cookies.txt', 'cookies.json']:
                 if os.path.exists(filepath):
                     try:
                         with open(filepath, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                        if parse_cookies_string(session, content):
-                            cookies_loaded = True
-                            break
-                    except Exception as file_err:
-                        print(f"Failed to read cookie file {filepath}: {file_err}")
+                            cookies_content = f.read()
+                        break
+                    except Exception:
+                        pass
         
-        api = YouTubeTranscriptApi(http_client=session)
-        transcript = api.fetch(video_id)
+        # 2. Write cookies to a temporary file if we have cookies content
+        if cookies_content:
+            fd, temp_path = tempfile.mkstemp(suffix='.txt')
+            try:
+                with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                    f.write(cookies_content)
+                temp_cookie_file = temp_path
+            except Exception as e:
+                print(f"Failed to create temporary cookies file: {e}")
+        
+        # 3. Call youtube-transcript-api based on the library version
+        if hasattr(YouTubeTranscriptApi, 'get_transcript'):
+            # OLD VERSION (e.g. 0.6.2)
+            if temp_cookie_file:
+                transcript = YouTubeTranscriptApi.get_transcript(video_id, cookies=temp_cookie_file)
+            else:
+                transcript = YouTubeTranscriptApi.get_transcript(video_id)
+            
+            # In old version, transcript is a list of dicts: [{'text': '...', 'start': ...}]
+            text = " ".join(
+                chunk['text'] for chunk in transcript
+            )
+        else:
+            # NEW VERSION (e.g. 1.2.4)
+            from requests import Session
+            session = Session()
+            
+            if temp_cookie_file:
+                # Load cookies into session
+                cookies_loaded = False
+                # Try parsing as JSON first
+                if cookies_content.strip().startswith('['):
+                    try:
+                        import json
+                        cookies_list = json.loads(cookies_content)
+                        for cookie in cookies_list:
+                            name = cookie.get('name') or cookie.get('key')
+                            value = cookie.get('value')
+                            domain = cookie.get('domain')
+                            path = cookie.get('path', '/')
+                            if name and value:
+                                session.cookies.set(name, value, domain=domain, path=path)
+                        cookies_loaded = True
+                    except Exception:
+                        pass
+                
+                # Fallback to MozillaCookieJar Netscape loader
+                if not cookies_loaded:
+                    try:
+                        import http.cookiejar
+                        cj = http.cookiejar.MozillaCookieJar(temp_cookie_file)
+                        cj.load(ignore_discard=True, ignore_expires=True)
+                        session.cookies = cj
+                    except Exception as cookie_err:
+                        print(f"Failed to load Netscape cookies: {cookie_err}")
+            
+            api = YouTubeTranscriptApi(http_client=session)
+            transcript = api.fetch(video_id)
+            
+            text = " ".join(
+                chunk.text for chunk in transcript
+            )
 
-        text = " ".join(
-            chunk.text for chunk in transcript
-        )
+        # Clean up temporary cookie file
+        if temp_cookie_file and os.path.exists(temp_cookie_file):
+            try:
+                os.remove(temp_cookie_file)
+            except Exception:
+                pass
 
         return text
 
     except Exception as e:
+        # Clean up temporary cookie file in case of exception
+        if temp_cookie_file and os.path.exists(temp_cookie_file):
+            try:
+                os.remove(temp_cookie_file)
+            except Exception:
+                pass
         print(f"Transcript Error: {e}")
         return ""
